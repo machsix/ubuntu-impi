@@ -1,0 +1,16 @@
+
+# Modification for PATH ============
+vscode_dir=$(dirname "$(which code)")
+tecplot_dir=$(dirname "$(which tec360.exe)")
+# remove Windows's pathes
+export PATH=$(/usr/bin/printenv PATH | /usr/bin/perl -ne 'print join(":", grep { !/\/mnt\/[a-z]/ } split(/:/));')
+if [ -n "${vscode_dir}" ]; then
+	export PATH="${PATH}:${vscode_dir}"
+fi
+if [ -n "${tecplot_dir}" ]; then
+	export PATH="${PATH}:${tecplot_dir}"
+fi
+unset vscode_dir
+unset tecplot_dir
+export EDITOR="vim"
+export LS_COLORS='ow=01;36;40'
