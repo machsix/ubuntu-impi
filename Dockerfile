@@ -1,4 +1,4 @@
-FROM intel/oneapi-hpckit:2023.1.0-devel-ubuntu22.04
+FROM intel/oneapi-hpckit:2023.2.1-devel-ubuntu22.04
 LABEL org.opencontainers.image.authors="28209092+machsix@users.noreply.github.com>"
 ARG LLVM_VERSION=17
 
@@ -23,10 +23,10 @@ RUN apt-get update && \
 	locales \
 	libarchive13 \
 	zsh \
-    pkg-config \
+        pkg-config \
 	curl \
-    iputils-ping \
-    rsync \
+        iputils-ping \
+        rsync \
 	fontconfig \
 	doxygen \
 	graphviz \
@@ -49,7 +49,7 @@ RUN apt-add-repository ppa:git-core/ppa && \
 	python3-pip \
 	python3-pynvim \
 	python3-distutils \
-    python3-lib2to3 && \
+        python3-lib2to3 && \
 	rm -rf /var/lib/apt/lists/* && \
 	ln -sf $(which python3.10) /usr/local/bin/python
 
@@ -73,7 +73,6 @@ RUN apt-get update && \
 	cd .. && rm -rf Lmod-8.7 && \
 	ln -s /opt/lmod/lmod/init/profile        /etc/profile.d/z00_lmod.sh && \
 	ln -s /opt/lmod/lmod/init/cshrc          /etc/profile.d/z00_lmod.csh
-
 
 RUN sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen && \
     locale-gen && \
