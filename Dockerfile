@@ -3,10 +3,13 @@ LABEL org.opencontainers.image.authors="28209092+machsix@users.noreply.github.co
 ARG LLVM_VERSION=17
 
 # fix intel key
-RUN wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB | \
-    tee /etc/apt/trusted.gpg.d/oneapi-archive-keyring.asc > /dev/null && \
-    wget -qO - https://repositories.intel.com/graphics/intel-graphics.key | \
-    tee /etc/apt/trusted.gpg.d/intel-graphics.asc > /dev/null
+RUN wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB \ 
+	| gpg --dearmor | tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null && \
+	wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB \ 
+	| gpg --dearmor | sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null
+
+RUN echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | tee /etc/apt/sources.list.d/oneAPI.list && \
+	echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | tee /etc/apt/sources.list.d/oneAPI.list
 
 # install fundamental packages
 RUN echo 'APT::Acquire::Retries "10";' > /etc/apt/apt.conf.d/80-retries
