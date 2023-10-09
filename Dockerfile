@@ -10,6 +10,7 @@ RUN wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRO
 
 # install fundamental packages
 RUN echo 'APT::Acquire::Retries "10";' > /etc/apt/apt.conf.d/80-retries
+RUN apt-get update && apt-get install -y apt-transport-https
 RUN apt-get update && \
 	apt-get upgrade -y && \
 	DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends -o=Dpkg::Use-Pty=0 \
