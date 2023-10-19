@@ -15,7 +15,7 @@ jobs:
         uses: "actions/checkout@v4"
       - name: Read VERSION file
         id: getversion
-        run: echo "::set-output name=version::$(cat VERSION)"
+        run: echo "version=$(cat VERSION)" >> $GITHUB_OUTPUT
       - name: Set up docker tag
         run: |
           echo "IMAGE_TAG=machsix/ubuntu-impi:${{ steps.getversion.outputs.version }}" >> $GITHUB_ENV

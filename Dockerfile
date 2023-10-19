@@ -3,16 +3,23 @@ LABEL org.opencontainers.image.authors="28209092+machsix@users.noreply.github.co
 ARG LLVM_VERSION=17
 
 # fix intel key
-RUN wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB \ 
+RUN wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB \
 	| gpg --dearmor | tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null
-RUN echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | tee /etc/apt/sources.list.d/oneAPI.list
+RUN echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" \
+	| tee /etc/apt/sources.list.d/oneAPI.list
+RUN wget -O- https://apt.kitware.com/keys/kitware-archive-latest.asc 2> /dev/null \
+	| gpg --dearmor - | tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null
+RUN echo 'deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ jammy main' \
+	| tee /etc/apt/sources.list.d/kitware.list >/dev/null
 
 # install fundamental packages
 RUN echo 'APT::Acquire::Retries "10";' > /etc/apt/apt.conf.d/80-retries
-RUN apt-get update && apt-get install -y apt-transport-https
+RUN apt-get update && apt-get install -y apt-transport-https kitware-archive-keyring
+RUN rm /usr/share/keyrings/kitware-archive-keyring.gpg
 RUN apt-get update && \
 	apt-get upgrade -y && \
 	DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends -o=Dpkg::Use-Pty=0 \
+	cmake \
 	wget \
 	gnupg \
 	openssl \
@@ -23,10 +30,10 @@ RUN apt-get update && \
 	locales \
 	libarchive13 \
 	zsh \
-        pkg-config \
+	pkg-config \
 	curl \
-        iputils-ping \
-        rsync \
+	iputils-ping \
+	rsync \
 	fontconfig \
 	doxygen \
 	graphviz \
@@ -49,9 +56,18 @@ RUN apt-add-repository ppa:git-core/ppa && \
 	python3-pip \
 	python3-pynvim \
 	python3-distutils \
-        python3-lib2to3 && \
+	python3-lib2to3 && \
 	rm -rf /var/lib/apt/lists/* && \
 	ln -sf $(which python3.10) /usr/local/bin/python
+
+# install nvdia cuda toolkit
+RUN apt-key del 7fa2af80 && \
+	wget https://developer.download.nvidia.com/compute/cuda/repos/wsl-ubuntu/x86_64/cuda-keyring_1.1-1_all.deb && \
+	dpkg -i cuda-keyring_1.1-1_all.deb && \
+	apt-get update && \
+	DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends -o=Dpkg::Use-Pty=0 -y cuda && \
+	rm -rf /var/lib/apt/lists/* && \
+	rm -f cuda-keyring_1.1-1_all.deb
 
 # install llvm
 RUN wget https://apt.llvm.org/llvm.sh && \
