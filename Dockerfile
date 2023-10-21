@@ -9,17 +9,13 @@ RUN echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https:/
     | tee /etc/apt/sources.list.d/oneAPI.list
 RUN wget -O- https://apt.kitware.com/keys/kitware-archive-latest.asc 2> /dev/null \
     | gpg --dearmor - | tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null
-RUN echo 'deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ jammy main' \
-    | tee /etc/apt/sources.list.d/kitware.list >/dev/null
 
 # install fundamental packages
 RUN echo 'APT::Acquire::Retries "10";' > /etc/apt/apt.conf.d/80-retries
-RUN apt-get update && apt-get install -y apt-transport-https kitware-archive-keyring
-RUN rm /usr/share/keyrings/kitware-archive-keyring.gpg
+RUN apt-get update && apt-get install -y apt-transport-https && rm -rf /var/lib/apt/lists/*
 RUN apt-get update && \
     apt-get upgrade -y && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends -o=Dpkg::Use-Pty=0 \
-    cmake \
     wget \
     gnupg \
     openssl \
@@ -41,6 +37,12 @@ RUN apt-get update && \
     ca-certificates \
     iproute2 \
     software-properties-common && \
+    rm -rf /var/lib/apt/lists/*
+
+# install cmake
+RUN curl -s -L https://apt.kitware.com/kitware-archive.sh | DEBIAN_FRONTEND=noninteractive bash && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends -o=Dpkg::Use-Pty=0 \
+    cmake && \
     rm -rf /var/lib/apt/lists/*
 
 # install git + vim + python
@@ -74,7 +76,9 @@ RUN wget https://apt.llvm.org/llvm.sh && \
     chmod +x llvm.sh && \
     ./llvm.sh ${LLVM_VERSION} &&\
     rm -rf /var/lib/apt/lists/* && \
-    rm -f llvm.sh
+    rm -f llvm.sh && \
+    mkdir -p /usr/local/bin/llvm && \
+    for i in /usr/bin/*-${LLVM_VERSION}; do ln -sf "${i}" "/usr/local/bin/llvm/${i%-${LLVM_VERSION}}"; done
 
 # install lua
 RUN apt-get update && \
@@ -102,13 +106,10 @@ ENV LD_LIBRARY_PATH=
 ENV LIBRARY_PATH=
 ENV MANPATH=
 
-# set clang env
-COPY docker_build/set-clang.sh .
-RUN bash ./set-clang.sh && \
-    rm -f set-clang.sh
-
+# copy my tools
 COPY docker_file/ /
-RUN chmod 644 /etc/profile.d/05-intel-compiler.sh && \
+RUN chmod 644 /etc/profile.d/04-llvm.sh && \
+    chmod 644 /etc/profile.d/05-intel-compiler.sh && \
     chmod 744 /opt/tools/*.sh && \
     chmod 744 /root/create_user.sh
 
