@@ -78,7 +78,7 @@ RUN wget https://apt.llvm.org/llvm.sh && \
     rm -rf /var/lib/apt/lists/* && \
     rm -f llvm.sh && \
     mkdir -p /usr/local/bin/llvm && \
-    for i in /usr/bin/*-${LLVM_VERSION}; do ln -sf "${i}" "/usr/local/bin/llvm/${i%-${LLVM_VERSION}}"; done
+    for i in /usr/bin/*-${LLVM_VERSION}; do ln -sf ${i} /usr/local/bin/llvm/${$(basename $i)%-${LLVM_VERSION}}; done
 
 # install lua
 RUN apt-get update && \
