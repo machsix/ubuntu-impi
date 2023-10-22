@@ -4,17 +4,15 @@ ARG LLVM_VERSION=17
 
 # fix intel key
 RUN wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB \
-    | gpg --dearmor | tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null
-RUN echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" \
-    | tee /etc/apt/sources.list.d/oneAPI.list
-RUN wget -O- https://apt.kitware.com/keys/kitware-archive-latest.asc 2> /dev/null \
+    | gpg --dearmor | tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null && \
+    echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" \
+    | tee /etc/apt/sources.list.d/oneAPI.list && \
+    wget -O- https://apt.kitware.com/keys/kitware-archive-latest.asc 2> /dev/null \
     | gpg --dearmor - | tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null
 
 # install fundamental packages
-RUN echo 'APT::Acquire::Retries "10";' > /etc/apt/apt.conf.d/80-retries
-RUN apt-get update && apt-get install -y apt-transport-https && rm -rf /var/lib/apt/lists/*
-RUN apt-get update && \
-    apt-get upgrade -y && \
+RUN echo 'APT::Acquire::Retries "10";' > /etc/apt/apt.conf.d/80-retries && \
+    apt-get update && apt-get install -y apt-transport-https && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends -o=Dpkg::Use-Pty=0 \
     wget \
     gnupg \
@@ -72,13 +70,14 @@ RUN apt-key del 7fa2af80 && \
     rm -f cuda-keyring_1.1-1_all.deb
 
 # install llvm
+COPY docker_build/set_clang.sh ./
 RUN wget https://apt.llvm.org/llvm.sh && \
     chmod +x llvm.sh && \
     ./llvm.sh ${LLVM_VERSION} &&\
     rm -rf /var/lib/apt/lists/* && \
     rm -f llvm.sh && \
-    mkdir -p /usr/local/bin/llvm && \
-    for i in /usr/bin/*-${LLVM_VERSION}; do ln -sf ${i} /usr/local/bin/llvm/${$(basename $i)%-${LLVM_VERSION}}; done
+    bash set_clang.sh && \
+    rm -rf set_clang.sh
 
 # install lua
 RUN apt-get update && \
@@ -108,8 +107,7 @@ ENV MANPATH=
 
 # copy my tools
 COPY docker_file/ /
-RUN chmod 644 /etc/profile.d/04-llvm.sh && \
-    chmod 644 /etc/profile.d/05-intel-compiler.sh && \
+RUN chmod 644 /etc/profile.d/zzz_05-intel-compiler.sh && \
     chmod 744 /opt/tools/*.sh && \
     chmod 744 /root/create_user.sh
 
