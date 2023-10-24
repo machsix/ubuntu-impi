@@ -34,6 +34,8 @@ RUN echo 'APT::Acquire::Retries "10";' > /etc/apt/apt.conf.d/80-retries && \
     tmux \
     ca-certificates \
     iproute2 \
+    sudo \
+    binfmt-support \
     software-properties-common && \
     rm -rf /var/lib/apt/lists/*
 
@@ -78,6 +80,11 @@ RUN wget https://apt.llvm.org/llvm.sh && \
     rm -f llvm.sh && \
     bash set_clang.sh && \
     rm -rf set_clang.sh
+
+# setup wsl
+COPY docker_build/set_wsl.sh ./
+RUN bash set_wsl.sh && \
+    rm -rf set_wsl.sh
 
 # install lua
 RUN apt-get update && \
