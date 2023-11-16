@@ -48,6 +48,10 @@ jobs:
           tags: ${{ env.IMAGE_TAG }}
           build-args: |
             VERSION=${{ env.IMAGE_VERSION }}
+      - name: Dive
+        run:  |
+          docker pull wagoodman/dive
+          docker run --rm -e CI=true -e DOCKER_API_VERSION=1.43 -v /var/run/docker.sock:/var/run/docker.sock wagoodman/dive -i --ci  ${IMAGE_TAG}
       - name: Export rootfs
         run: |
           docker export $(docker create ${IMAGE_TAG}) | gzip > ubuntu-impi-${IMAGE_VERSION}.tar.gz
