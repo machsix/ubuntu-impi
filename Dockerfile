@@ -2,7 +2,8 @@ FROM intel/oneapi-hpckit:2023.2.1-devel-ubuntu22.04
 LABEL org.opencontainers.image.authors="28209092+machsix@users.noreply.github.com>"
 ARG LLVM_VERSION=17
 ARG PYTHON_VERSION=3.12
-ARG INTEL_VERSION=2023.2.0
+ARG INTEL_VERSION=2023.2.1
+ARG CUDA_TOOLKIT=cuda-toolkit-12-4
 # Fix keys
 RUN wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB \
     | gpg --dearmor | tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null && \
@@ -12,13 +13,19 @@ RUN wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRO
     | gpg --dearmor - | tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null && \
     wget -O- https://apt.kitware.com/kitware-archive.sh 2> /dev/null | DEBIAN_FRONTEND=noninteractive bash
 
+RUN mkdir -p /etc/apt/preferences.d
+COPY docker_build/intel_pref /etc/apt/preferences.d/
+
 # install fundamental packages
 RUN echo 'APT::Acquire::Retries "10";' > /etc/apt/apt.conf.d/80-retries && \
     apt-get update && \
     apt-get upgrade -y && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y apt-transport-https && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y apt-transport-https software-properties-common && \
+    apt-add-repository ppa:git-core/ppa && \
+    apt-add-repository ppa:deadsnakes/ppa && \
+    apt-add-repository ppa:jonathonf/vim && \
+    apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends -o=Dpkg::Use-Pty=0 \
-    wget \
     gnupg \
     openssl \
     openssh-client \
@@ -40,37 +47,28 @@ RUN echo 'APT::Acquire::Retries "10";' > /etc/apt/apt.conf.d/80-retries && \
     iproute2 \
     sudo \
     binfmt-support \
-    software-properties-common \
-    intel-hpckit-${INTEL_VERSION} \
-    cmake && \
-    rm -rf /var/lib/apt/lists/* && \
-    mkdir -p /etc/apt/preferences.d
-
-COPY docker_build/intel_pref /etc/apt/preferences.d/
-
-# install git + vim + python
-RUN apt-add-repository ppa:git-core/ppa && \
-    apt-add-repository ppa:deadsnakes/ppa && \
-    apt-add-repository ppa:jonathonf/vim && \
-    apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends -o=Dpkg::Use-Pty=0 \
     vim \
     git \
     python${PYTHON_VERSION} \
+    python${PYTHON_VERSION}-dev \
+    python${PYTHON_VERSION}-venv \
+    python${PYTHON_VERSION}-distutils \
     python3-pip \
-    python3-pynvim \
-    python3-distutils \
-    python3-lib2to3 && \
+    python${PYTHON_VERSION}-lib2to3 \
+    cmake && \
     apt-get autoremove -y && \
+    apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
-    ln -sf $(which python3.10) /usr/local/bin/python
+    ln -sf $(which python${PYTHON_VERSION}) /usr/local/bin/python
 
 # install nvdia cuda toolkit
 RUN apt-key del 7fa2af80 && \
     wget https://developer.download.nvidia.com/compute/cuda/repos/wsl-ubuntu/x86_64/cuda-keyring_1.1-1_all.deb && \
     dpkg -i cuda-keyring_1.1-1_all.deb && \
     apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends -o=Dpkg::Use-Pty=0 -y cuda-toolkit-12-3 && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends -o=Dpkg::Use-Pty=0 -y ${CUDA_TOOLKIT} && \
+    apt-get autoremove -y && \
+    apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
     rm -f cuda-keyring_1.1-1_all.deb
 

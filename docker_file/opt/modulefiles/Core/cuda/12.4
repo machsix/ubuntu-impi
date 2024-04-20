@@ -1,6 +1,6 @@
 #%Module1.0#####################################################################
 ##
-## cuda 12.2 modulefile
+## cuda 12.4 modulefile
 ##
 proc ModulesHelp { } {
         global version modroot
@@ -8,10 +8,10 @@ proc ModulesHelp { } {
         puts stdout "\t loads CUDA $version \n"
 }
 
-module-whatis   "loads CUDA 12.2"
+module-whatis   "loads CUDA 12.4"
 
 # for Tcl script use only
-set     version      12.2
+set     version      12.4
 set     root         /usr/local/cuda-${version}
 setenv  CUDA_HOME    $root
 

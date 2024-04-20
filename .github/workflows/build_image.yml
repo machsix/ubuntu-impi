@@ -19,48 +19,71 @@ jobs:
           large-packages: true
           docker-images: false
           swap-storage: true
+
       - name: "Checkout source code"
         uses: "actions/checkout@v4"
-      - name: Read VERSION file
-        id: getversion
-        run: echo "version=$(cat VERSION)" >> $GITHUB_OUTPUT
-      - name: Set up docker tag
-        run: |
-          echo "IMAGE_TAG=machsix/ubuntu-impi:${{ steps.getversion.outputs.version }}" >> $GITHUB_ENV
-          echo "IMAGE_VERSION=${{ steps.getversion.outputs.version }}" >> $GITHUB_ENV
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-        with:
-          buildkitd-flags: --debug
-      - name: Login to DockerHub
+
+      - name: Log in to the Container registry
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Build and push
-        id: docker_build
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ghcr.io/${{ github.repository }}
+          tags: |
+            type=raw,value=latest,enable=true
+            type=raw,value={{date 'YYYYMMDD'}},enable=true,priority=1000
+            type=sha,format=short,prefix=,enable=true
+          flavor: latest=false
+
+      - name: Set up version
+        id: getversion
+        run: |
+          tags=(${{ steps.meta.outputs.tags }})
+          tag=${tags[0]}
+          version=$(echo ${tags[0]} | cut -d ':' -f 2)
+          echo ${version}
+          echo "tag=${tag}" >> $GITHUB_OUTPUT
+          echo "version=${version}" >> $GITHUB_OUTPUT
+          echo "rootfs=ubuntu-impi-${version}" >> $GITHUB_OUTPUT
+
+      - name: Build and push Docker image
+        id: build-and-push
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          tags: ${{ env.IMAGE_TAG }}
-          build-args: |
-            VERSION=${{ env.IMAGE_VERSION }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
       - name: Export rootfs
         run: |
-          docker export $(docker create ${IMAGE_TAG}) | gzip > ubuntu-impi-${IMAGE_VERSION}.tar.gz
-          md5sum ubuntu-impi-${IMAGE_VERSION}.tar.gz > ubuntu-impi-${IMAGE_VERSION}.md5
+          docker export $(docker create ${{ steps.getversion.outputs.tag }}) | gzip > ${{ steps.getversion.outputs.rootfs }}.tar.gz
+          md5sum ${{ steps.getversion.outputs.rootfs }}.tar.gz > ${{ steps.getversion.outputs.rootfs }}.md5
       - name: Upload rootfs
         uses: actions/upload-artifact@v3
         with:
-          name: ubuntu-impi-${{ env.IMAGE_VERSION }}.tar.gz
-          path: ubuntu-impi-${{ env.IMAGE_VERSION }}.tar.gz
+          name: ${{ steps.getversion.outputs.rootfs }}.tar.gz
+          path: ${{ steps.getversion.outputs.rootfs }}.tar.gz
           if-no-files-found: error
-      - name: Upload rootfs
+      - name: Upload rootfs md5sum
         uses: actions/upload-artifact@v3
         with:
-          name: ubuntu-impi-${{ env.IMAGE_VERSION }}.md5
-          path: ubuntu-impi-${{ env.IMAGE_VERSION }}.md5
+          name: ${{ steps.getversion.outputs.rootfs }}.md5
+          path: ${{ steps.getversion.outputs.rootfs }}.md5
           if-no-files-found: error
