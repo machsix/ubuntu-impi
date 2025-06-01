@@ -1,0 +1,19 @@
+#%Module -*- tcl -*-
+##
+## modulefile
+##
+proc ModulesHelp { } {
+
+  puts stderr "Adds HDF5/1.12.3 to your environment variables,"
+}
+
+module-whatis "adds HDF5 to your environment variables"
+
+set              version              1.12.3
+set              root                 /opt/hdf5/1.12.3
+prepend-path     PATH                 $root/bin
+prepend-path     LD_LIBRARY_PATH      $root/lib
+setenv           HDF5_ROOT            $root
+setenv           HDF5DIR              $root/lib
+setenv           HDF5INCLUDE          $root/include
+setenv           HDF5LIB              hdf5
