@@ -46,20 +46,32 @@ RUN apt-get update && \
     python3-distutils \
     python3-pip \
     cmake \
+    libssl-dev libcurl4-openssl-dev \
     lua5.1 lua5.1-bitop liblua5.1-0-dev lua5.1-json lua5.1-lpeg-dev lua5.1-posix-dev lua5.1-term \
     tcl-dev tree bc file patchelf \
     vim-nox \
     && apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* && \
+    curl -fsSL https://github.com/mikefarah/yq/releases/download/v4.45.4/yq_linux_amd64.tar.gz -o yq.tar.gz && \
+    tar -xzf yq.tar.gz && \
+    mv yq_linux_amd64 /usr/local/bin/yq && \
+    rm yq*
+
 
 # Install Miniconda from conda-forge
 ARG CONDA_INSTALL_DIR=/opt/python/miniforge3
 WORKDIR /opt/pkgs/miniforge3
-RUN curl -fsSL https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -o miniconda.sh && \
+RUN curl -fsSL https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh -o miniconda.sh && \
     bash miniconda.sh -b -p ${CONDA_INSTALL_DIR} && \
-    echo "blas=*=mkl" >> ${CONDA_INSTALL_DIR}/conda-meta/pinned && \
-    ${CONDA_INSTALL_DIR}/bin/conda config --system --add channels conda-forge && \
-    ${CONDA_INSTALL_DIR}/bin/conda config --system --set channel_priority strict
+    . /opt/python/miniforge3/etc/profile.d/conda.sh && \
+    sed -i '/defaults/d' ${CONDA_INSTALL_DIR}/.condarc && \
+    # conda config --system --set ssl_verify false 2>/dev/null && \
+    conda install -y conda-libmamba-solver mamba python=3.11 && \
+    conda config --system --set solver libmamba && \
+    conda install -y numpy scipy matplotlib pandas tecio "libblas=*=*mkl" jupyterlab hdf5 python-lsp-ruff && \
+    mkdir -p ${CONDA_INSTALL_DIR}/conda-meta && \
+    echo "libblas=*=mkl" >> ${CONDA_INSTALL_DIR}/conda-meta/pinned && \
+    echo "python 3.11.*" >> ${CONDA_INSTALL_DIR}/conda-meta/pinned
 
 
 # install lmod
@@ -71,10 +83,8 @@ RUN curl -L https://github.com/TACC/Lmod/archive/refs/tags/${LMOD_VERSION}.tar.g
     cd /opt/pkgs/lmod && \
     ./configure --prefix=/opt && \
     make install && \
-    ln -s /opt/lmod/lmod/init/profile        /etc/profile.d/z00_lmod.sh && \
-    ln -s /opt/lmod/lmod/init/cshrc          /etc/profile.d/z00_lmod.csh && \
-    echo 'MODULEPATH=/opt/spack/share/spack/lmod/linux-debian12-x86_64:${MODULEPATH}' >> /etc/profile.d/z00_lmod.sh && \
-    . /etc/profile.d/z00_lmod.sh
+    ln -s /opt/lmod/lmod/init/profile  /etc/profile.d/z00_lmod.sh && \
+    ln -s /opt/lmod/lmod/init/cshrc    /etc/profile.d/z00_lmod.csh
 
 
 # install intel oneAPI
@@ -87,50 +97,29 @@ RUN curl -L https://registrationcenter-download.intel.com/akdlm/IRC_NAS/0722521a
     curl -L https://registrationcenter-download.intel.com/akdlm/IRC_NAS/992857b9-624c-45de-9701-f6445d845359/l_BaseKit_p_2023.2.0.49397.sh \
     -o l_BaseKit_p_${INTEL_VERSION}.sh && \
     chmod +x l_BaseKit_p_${INTEL_VERSION}.sh && \
-    ./l_BaseKit_p_${INTEL_VERSION}.sh -a -s --eula accept --components intel.oneapi.lin.mkl.devel:intel.oneapi.lin.vtune && \
-    . /opt/intel/oneapi/setvars.sh
+    ./l_BaseKit_p_${INTEL_VERSION}.sh -a -s --eula accept --components intel.oneapi.lin.mkl.devel:intel.oneapi.lin.vtune
 
 # install Spack
 ARG SPACK_VERSION=0.23.1
+ARG SPACK_ROOT=/opt/spack
 WORKDIR /opt/pkgs/spack
+COPY docker_build/setup_spack.sh /opt/pkgs/spack/setup_spack.sh
 RUN curl -L https://github.com/spack/spack/releases/download/v${SPACK_VERSION}/spack-${SPACK_VERSION}.tar.gz -o  spack-${SPACK_VERSION}.tar.gz && \
     mkdir -p /opt/spack && \
     tar -C /opt/spack -xzf spack-${SPACK_VERSION}.tar.gz --strip-component=1 && \
     ln -s /opt/spack/share/spack/spack-completion.bash /etc/bash_completion.d/spack-completion.bash && \
-    mkdir -p /etc/spack && \
-    . /etc/profile.d/z00_lmod.sh && \
-    . /opt/intel/oneapi/setvars.sh && \
+    bash /opt/pkgs/spack/setup_spack.sh ${SPACK_VERSION} && \
     . /opt/spack/share/spack/setup-env.sh && \
-    cp -a /opt/spack/etc/spack/defaults/config.yaml /etc/spack/config.yaml && \
-    sed -i 's|^    root: .*|    root: /opt|' /etc/spack/config.yaml && \
-    sed -i 's|^\([[:space:]]*all:\) "{architecture}\(.*"\)|\1 "spack_built\2|' /etc/spack/config.yaml && \
-    ln -sf /etc/spack /root/.spack && \
-    spack config add modules:default:enable:[lmod] && \
-    echo 'export MODULEPATH=/opt/spack/share/spack/lmod/linux-ubuntu22.04-x86_64:${MODULEPATH}' >> /etc/profile.d/z00_lmod.sh && \
-    spack compiler find && \
-    spack external find && \
-    echo "  intel-oneapi-mpi:" >> /etc/spack/packages.yaml && \
-    echo "    externals:" >> /etc/spack/packages.yaml && \
-    echo "    - spec: intel-oneapi-mpi@2021.10.0" >> /etc/spack/packages.yaml && \
-    echo "      prefix: /opt/intel/oneapi" >> /etc/spack/packages.yaml && \
-    echo "  intel-oneapi-mkl:" >> /etc/spack/packages.yaml && \
-    echo "    externals:" >> /etc/spack/packages.yaml && \
-    echo "    - spec: intel-oneapi-mkl@2023.2.0" >> /etc/spack/packages.yaml && \
-    echo "      prefix: /opt/intel/oneapi/" >> /etc/spack/packages.yaml && \
-    wget https://github.com/mikefarah/yq/releases/download/v4.45.4/yq_linux_amd64.tar.gz -O - |\
-    tar xz && mv yq_linux_amd64 /usr/local/bin/yq && \
-    yq -i '.compilers[0].compiler.environment = {"prepend_path": { "LD_LIBRARY_PATH": "/opt/intel/oneapi/compiler/2023.2.0/linux/compiler/lib/intel64", "LIBRARY_PATH": "/opt/intel/oneapi/compiler/2023.2.0/linux/compiler/lib/intel64" }    }' /root/.spack/linux/compilers.yaml && \
-    spack -d install -v hdf5@1.12.3%intel@2021.10.0 +fortran+hl+mpi api=v110 ^intel-oneapi-mpi ++classic-names && \
-    spack module lmod refresh --delete-tree -y && \
     spack clean --all
 
 # setup files
-COPY docker_file/opt/modulefiles /opt/modulefiles
-COPY docker_file/opt/tools /opt/tools
-COPY docker_file/root/ root/
+WORKDIR /root
+COPY docker_file/opt/modulefiles/ /opt/modulefiles/
+COPY docker_file/opt/tools/ /opt/tools/
+COPY docker_file/root/ /root/
 COPY docker_build/bashrc_mod ./
-RUN chmod 744 /root/create_user.sh && \
-cat bashrc_mod >> /etc/skel/.bashrc && \
+RUN ls /root && chmod 744 /root/create_user.sh && \
+    cat bashrc_mod >> /etc/skel/.bashrc && \
     cat bashrc_mod >> /root/.bashrc && \
     rm -f bashrc_mod
 
